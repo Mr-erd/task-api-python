@@ -1,8 +1,14 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel  # <-- NOVO IMPORTE
 
 app = FastAPI()
 
-# 1. Nosso "banco de dados" em memória (uma lista de dicionários)
+
+# Modelo de dados que o cliente deve enviar
+class TaskCreate(BaseModel):
+    title: str
+
+
 tasks_db = [
     {"id": 1, "title": "Buy milk", "done": False},
     {"id": 2, "title": "Learn FastAPI", "done": True},
@@ -10,29 +16,26 @@ tasks_db = [
 ]
 
 
-@app.get("/")
-def read_root():
-    return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
+# ... (Mantenha as rotas /, /health, /tasks e /tasks/{task_id} aqui) ...
 
+# 4. Rota para criar uma nova tarefa (Create)
+@app.post("/tasks", status_code=201)
+def create_task(task: TaskCreate):
+    # Regra de Negócio: se o título for vazio, retorne 400 Bad Request
+    if not task.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+    # Descobre qual será o próximo ID
+    next_id = max(t["id"] for t in tasks_db) + 1 if tasks_db else 1
 
+    # Cria o novo dicionário da tarefa
+    new_task = {
+        "id": next_id,
+        "title": task.title,
+        "done": False  # Começa como falso
+    }
 
-# 2. Rota para ler todas as tarefas (List)
-@app.get("/tasks")
-def get_tasks():
-    return tasks_db
+    # Adiciona à nossa lista em memória
+    tasks_db.append(new_task)
 
-
-# 3. Rota para ler uma tarefa específica (Single task) usando Path Parameter
-@app.get("/tasks/{task_id}")
-def get_task(task_id: int):
-    # Procura a tarefa pelo ID
-    for task in tasks_db:
-        if task["id"] == task_id:
-            return task
-
-    # Se o loop terminar e não achar nada, retorna o erro 404
-    raise HTTPException(status_code=404, detail="Task not found")
+    return new_task
