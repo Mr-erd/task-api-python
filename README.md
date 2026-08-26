@@ -69,3 +69,16 @@ FastAPI automatically generates a live, interactive OpenAPI documentation. Once 
 - **In-Memory Storage:** Data is stored in a Python list. Restarting the server resets the data to its initial state.
 - **Validation:** Creating or updating a task with an empty string as a title returns a `400 Bad Request`.
 - **Error Handling:** Requesting, updating, or deleting a non-existent task ID returns a `404 Not Found` with a clear JSON error message.
+## 🤖 AI vs Me (Stage 7 - The Rematch)
+
+**Prompt used:**
+"Atue como um desenvolvedor backend sênior. Construa uma API RESTful em Python utilizando o framework FastAPI. A API deve gerenciar uma lista de tarefas (To-Do list) executando as quatro operações principais do CRUD. Utilize uma lista em memória para guardar os dados. Rotas: GET /, GET /health, GET /tasks, GET /tasks/{id}, POST /tasks (201), PUT /tasks/{id}, DELETE /tasks/{id} (204). Validação: Título vazio no POST/PUT retorna 400. ID não encontrado retorna 404."
+
+**1. What did the AI do better?**
+The AI included a very helpful top-level docstring to explain the module. It also utilized more advanced Pydantic features like `Field` for data validation, the `typing.Optional` module for clearer type hinting, and the `fastapi.status` module instead of hardcoding HTTP status integers.
+
+**2. What did it get wrong or quietly ignore?**
+Because the prompt was somewhat brief, the AI assumed its own structure for the data model initialization, which might differ from a strictly simple dictionary list if not tightly constrained. 
+
+**3. What did your prompt forget to specify?**
+I completely forgot to specify the "Stretch Goal" in the prompt! I didn't ask the AI to implement **Pagination** (`limit` and `offset`) for the `GET /tasks` route, so it built a standard route that returns all items at once.
