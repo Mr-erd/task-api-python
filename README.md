@@ -65,6 +65,7 @@ FastAPI automatically generates a live, interactive OpenAPI documentation. Once 
 ![Swagger UI Screenshot](./swagger.png)
 
 ## 🏗️ Technical Details & Business Rules
+- **Pagination:** The `GET /tasks` endpoint supports pagination via `limit` and `offset` query parameters. Real-world APIs never return "everything" at once because retrieving millions of records simultaneously would consume excessive server memory, overload the database, and result in massive network delays for the client.
 - **In-Memory Storage:** Data is stored in a Python list. Restarting the server resets the data to its initial state.
 - **Validation:** Creating or updating a task with an empty string as a title returns a `400 Bad Request`.
 - **Error Handling:** Requesting, updating, or deleting a non-existent task ID returns a `404 Not Found` with a clear JSON error message.

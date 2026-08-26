@@ -45,8 +45,9 @@ def health_check():
 
 # READ: Listar todas as tarefas (Stage 2)
 @app.get("/tasks")
-def get_tasks():
-    return tasks_db
+def get_tasks(limit: int = 10, offset: int = 0):
+    # O Python facilita muito isso usando "slicing" de listas
+    return tasks_db[offset : offset + limit]
 
 
 # READ: Listar uma tarefa específica (Stage 2)
