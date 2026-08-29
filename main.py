@@ -64,20 +64,30 @@ def health_check():
 # ROTAS CRUD
 # -----------------
 
-# READ: Listar todas as tarefas (Stage 2)
+# READ: Listar todas as tarefas
 @app.get("/tasks")
-def get_tasks(limit: int = 10, offset: int = 0):
-    # O Python facilita muito isso usando "slicing" de listas
-    return tasks_db[offset : offset + limit]
+def get_tasks():
+    cursor.execute("SELECT * FROM tasks")  #
+
+    tasks = []
+    for row in cursor.fetchall():
+        # row[0] é id, row[1] é title, row[2] é done
+        tasks.append({"id": row[0], "title": row[1], "done": bool(row[2])})
+
+    return tasks
 
 
-# READ: Listar uma tarefa específica (Stage 2)
+# READ: Listar uma tarefa específica
 @app.get("/tasks/{task_id}")
 def get_task(task_id: int):
-    for task in tasks_db:
-        if task["id"] == task_id:
-            return task
-    raise HTTPException(status_code=404, detail="Task not found")
+    # O sinal de interrogação (?) protege o banco contra ataques (Parameterized query)
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))  #
+    row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")  # [cite: 1]
+
+    return {"id": row[0], "title": row[1], "done": bool(row[2])}
 
 
 # CREATE: Criar uma nova tarefa (Stage 3)
