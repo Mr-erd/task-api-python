@@ -90,17 +90,20 @@ def get_task(task_id: int):
     return {"id": row[0], "title": row[1], "done": bool(row[2])}
 
 
-# CREATE: Criar uma nova tarefa (Stage 3)
+# CREATE: Adicionar uma nova tarefa
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskCreate):
     if not task.title.strip():
-        raise HTTPException(status_code=400, detail="Title cannot be empty")
+        raise HTTPException(status_code=400, detail="Title cannot be empty")  #
 
-    next_id = max(t["id"] for t in tasks_db) + 1 if tasks_db else 1
-    new_task = {"id": next_id, "title": task.title, "done": False}
-    tasks_db.append(new_task)
+    # Insere a tarefa no banco usando placeholder (?) para segurança
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (task.title, 0))  #
+    conn.commit()
 
-    return new_task
+    # Recupera o ID que o próprio banco de dados gerou automaticamente[cite: 1]
+    new_id = cursor.lastrowid
+
+    return {"id": new_id, "title": task.title, "done": False}
 
 
 # UPDATE: Atualizar uma tarefa (Stage 4)
