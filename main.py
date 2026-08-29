@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import sqlite3
 
 app = FastAPI()
 
@@ -19,11 +20,31 @@ class TaskUpdate(BaseModel):
 # -----------------
 # BANCO DE DADOS (MEMÓRIA)
 # -----------------
-tasks_db = [
-    {"id": 1, "title": "Buy milk", "done": False},
-    {"id": 2, "title": "Learn FastAPI", "done": True},
-    {"id": 3, "title": "Build a CRUD API", "done": False}
-]
+
+# 1. Conecta ao banco (isso cria o arquivo tasks.db automaticamente)
+conn = sqlite3.connect("tasks.db", check_same_thread=False)
+cursor = conn.cursor()
+
+# 2. Cria a tabela 'tasks' se ela ainda não existir
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0
+    )
+""")
+conn.commit()
+
+# 3. Conta quantas tarefas existem e insere exemplos apenas se a tabela estiver vazia
+cursor.execute("SELECT COUNT(*) FROM tasks")
+count = cursor.fetchone()[0]
+
+if count == 0:
+    cursor.executemany(
+        "INSERT INTO tasks (title, done) VALUES (?, ?)",
+        [("Buy milk", 0), ("Learn FastAPI", 1), ("Build a CRUD API", 0)]
+    )
+    conn.commit()
 
 
 # -----------------
