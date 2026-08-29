@@ -93,3 +93,23 @@ I completely forgot to specify the "Stretch Goal" in the prompt! I didn't ask th
 ### DB Browser Snapshot
 ![DB Browser View](./db_screenshot.png)
 
+## 🤖 Bonus Stage: The AI Rematch (Code Review)
+
+Nesta etapa bônus, criei um prompt com regras de negócio estritas e desafiei uma IA (Claude) a realizar a mesma migração do armazenamento em memória para SQLite. O objetivo foi realizar uma auditoria técnica (Code Review) para comparar as soluções.
+
+**O que a IA fez melhor (Acertos Arquiteturais):**
+* **Gerenciamento de Conexões:** Implementou um `contextmanager` para abrir e fechar a conexão com o banco a cada requisição, prevenindo *memory leaks*.
+* **Acesso aos Dados:** Utilizou `conn.row_factory = sqlite3.Row`, o que permite acessar os valores pelo nome da coluna (ex: `row["title"]`) em vez de índices, tornando o código mais legível e sustentável.
+* **Princípio DRY (Don't Repeat Yourself):** Criou funções auxiliares (`find_task`, `row_to_task`) para isolar a lógica de busca e formatação, reduzindo a duplicação de código nas rotas.
+
+**O que a IA errou ou ignorou sutilmente (Pontos de Atenção):**
+* **Funcionalidades Obsoletas:** A IA utilizou o decorador `@app.on_event("startup")` para a inicialização do banco. Em versões recentes do FastAPI, esse método foi descontinuado (*deprecated*), sendo o uso de *Lifespan events* a prática recomendada atual.
+
+**O que não foi solicitado e ela decidiu sozinha (Comportamento Implícito):**
+* **Validação de Dados:** Implementou proativamente schemas completos do Pydantic (`TaskCreate`, `TaskUpdate`) e descrições ricas para o Swagger, mesmo sem exigência explícita no prompt.
+* **Mock Data Específico:** Gerou dados de *seed* altamente específicos baseados em suposições próprias (ex: "Configurar CNC router").
+
+**Veredito:**
+A ferramenta de IA é excelente para gerar *boilerplate* e sugerir padrões de design mais avançados, mas a revisão humana crítica continua sendo indispensável para identificar práticas desatualizadas da documentação do framework e manter o controle total sobre a arquitetura da aplicação.
+
+
