@@ -82,3 +82,14 @@ Because the prompt was somewhat brief, the AI assumed its own structure for the 
 
 **3. What did your prompt forget to specify?**
 I completely forgot to specify the "Stretch Goal" in the prompt! I didn't ask the AI to implement **Pagination** (`limit` and `offset`) for the `GET /tasks` route, so it built a standard route that returns all items at once.
+
+## 💾 Database Integration (Week 3)
+
+- **Why SQLite:** It was chosen because it requires zero configuration, operates from a single file, and ensures data survives server restarts perfectly.
+- **Where the data lives:** The data lives in a file named `tasks.db`. This file is automatically created and seeded with initial tasks the first time the server runs.
+- **How to run:** Start the API using `python -m uvicorn main:app --reload`[cite: 1].
+- **SQL Exploration:** I used DB Browser to run raw queries like `SELECT COUNT(*) FROM tasks;` to verify data independently of the API[cite: 1].
+
+### DB Browser Snapshot
+![DB Browser View](./db_screenshot.png)
+
