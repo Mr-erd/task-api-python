@@ -106,29 +106,46 @@ def create_task(task: TaskCreate):
     return {"id": new_id, "title": task.title, "done": False}
 
 
-# UPDATE: Atualizar uma tarefa (Stage 4)
+# UPDATE: Atualizar uma tarefa existente
 @app.put("/tasks/{task_id}")
-def update_task(task_id: int, task_update: TaskUpdate):
-    for task in tasks_db:
-        if task["id"] == task_id:
-            if task_update.title is not None and not task_update.title.strip():
-                raise HTTPException(status_code=400, detail="Title cannot be empty")
+def update_task(task_id: int, task: TaskUpdate):
+    # 1. Verifica se a tarefa existe
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    row = cursor.fetchone()
 
-            if task_update.title is not None:
-                task["title"] = task_update.title
-            if task_update.done is not None:
-                task["done"] = task_update.done
-            return task
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")  #
 
-    raise HTTPException(status_code=404, detail="Task not found")
+    current_title = row[1]
+    current_done = bool(row[2])
+
+    # 2. Prepara os novos valores
+    new_title = task.title if task.title is not None else current_title
+    new_done = task.done if task.done is not None else current_done
+
+    if task.title is not None and not task.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")  #
+
+    # 3. Executa o UPDATE no banco de dados
+    cursor.execute(
+        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+        (new_title, int(new_done), task_id)
+    )
+    conn.commit()
+
+    return {"id": task_id, "title": new_title, "done": new_done}
 
 
-# DELETE: Deletar uma tarefa (Stage 4)
-@app.delete("/tasks/{task_id}", status_code=204)
+# DELETE: Remover uma tarefa
+@app.delete("/tasks/{task_id}", status_code=204)  # [cite: 1]
 def delete_task(task_id: int):
-    for i, task in enumerate(tasks_db):
-        if task["id"] == task_id:
-            del tasks_db[i]
-            return
+    # 1. Verifica se a tarefa existe
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    if cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Task not found")  # [cite: 1]
 
-    raise HTTPException(status_code=404, detail="Task not found")
+    # 2. Executa o DELETE no banco de dados[cite: 1]
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))  # [cite: 1]
+    conn.commit()
+
+    return None
