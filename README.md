@@ -1,26 +1,24 @@
-# Task API: In-Memory CRUD with FastAPI
+# Task API - FastAPI, PostgreSQL & Docker
 
-A RESTful API built with Python and FastAPI to manage a to-do list. This project was developed to demonstrate the implementation of core CRUD operations (Create, Read, Update, Delete), proper HTTP status codes management, and strict data validation.
+A RESTful API built with Python and FastAPI to manage a to-do list. This project was developed to demonstrate the practical application of core backend skills, including CRUD operations, robust HTTP status management, data validation, and modern containerization. By transitioning from in-memory storage to a **PostgreSQL** relational database orchestrated via **Docker Compose**, this API reflects real-world architectural standards.
 
-## 🚀 Quick Start (How to run this project)
+## 🚀 Quick Start (One-Command Setup)
 
-This API runs locally and uses in-memory storage (no external database required).
+This API is fully containerized, ensuring it runs identically on any machine without local environment conflicts.
 
 ### Prerequisites
-- Python 3.10+
+- Docker & Docker Compose
 - Git
 
 ### Installation & Execution
 1. Clone the repository and navigate to the project folder.
-2. Install the required dependencies:
+2. Copy the `.env.example` file and rename it to `.env` (it contains the necessary database variables).
+3. Start the entire stack (API + Database) with a single command:
    ```bash
-   pip install fastapi uvicorn
+   docker compose up
    ```
-3. Start the local server:
-   ```bash
-   python -m uvicorn main:app --reload
-   ```
-The server will start at `http://localhost:8000`.
+
+The server will start at `http://localhost:3000`.
 
 ## 🗂️ Endpoints Reference
 
@@ -42,7 +40,7 @@ Here is a complete example of a `POST` request creating a new task, demonstratin
 
 **Request:**
 ```bash
-curl -i -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Buy coffee"}'
+curl -i -X POST http://localhost:3000/tasks -H "Content-Type: application/json" -d '{"title":"Buy coffee"}'
 ```
 
 **Response:**
@@ -60,56 +58,81 @@ content-type: application/json
 
 FastAPI automatically generates a live, interactive OpenAPI documentation. Once the server is running, you can access the Swagger UI to explore and test all endpoints directly from your browser without needing tools like Postman or cURL.
 
-**Access the docs at:** `http://localhost:8000/docs`
+**Access the docs at:** `http://localhost:3000/docs`
 
 ![Swagger UI Screenshot](./swagger.png)
 
 ## 🏗️ Technical Details & Business Rules
 - **Pagination:** The `GET /tasks` endpoint supports pagination via `limit` and `offset` query parameters. Real-world APIs never return "everything" at once because retrieving millions of records simultaneously would consume excessive server memory, overload the database, and result in massive network delays for the client.
-- **In-Memory Storage:** Data is stored in a Python list. Restarting the server resets the data to its initial state.
+- **Persistent Storage:** Data is stored in a **PostgreSQL** database running in its own Docker container. Restarting the API service no longer resets the data — the database keeps its state in a Docker volume.
 - **Validation:** Creating or updating a task with an empty string as a title returns a `400 Bad Request`.
 - **Error Handling:** Requesting, updating, or deleting a non-existent task ID returns a `404 Not Found` with a clear JSON error message.
-## 🤖 AI vs Me (Stage 7 - The Rematch)
+## DB Persistence Snapshot
 
-**Prompt used:**
-"Atue como um desenvolvedor backend sênior. Construa uma API RESTful em Python utilizando o framework FastAPI. A API deve gerenciar uma lista de tarefas (To-Do list) executando as quatro operações principais do CRUD. Utilize uma lista em memória para guardar os dados. Rotas: GET /, GET /health, GET /tasks, GET /tasks/{id}, POST /tasks (201), PUT /tasks/{id}, DELETE /tasks/{id} (204). Validação: Título vazio no POST/PUT retorna 400. ID não encontrado retorna 404."
+### 🤖 Project Evolution & AI Audits (Code Review)
+
+Throughout the development of this API, AI tools were used for technical auditing and code reviews to compare human-written logic with AI-generated boilerplates.
+
+### Stage 7: The Rematch (In-Memory phase)
 
 **1. What did the AI do better?**
 The AI included a very helpful top-level docstring to explain the module. It also utilized more advanced Pydantic features like `Field` for data validation, the `typing.Optional` module for clearer type hinting, and the `fastapi.status` module instead of hardcoding HTTP status integers.
 
 **2. What did it get wrong or quietly ignore?**
-Because the prompt was somewhat brief, the AI assumed its own structure for the data model initialization, which might differ from a strictly simple dictionary list if not tightly constrained. 
+Because the prompt was somewhat brief, the AI assumed its own structure for the data model initialization, which might differ from a strictly simple dictionary list if not tightly constrained.
 
 **3. What did your prompt forget to specify?**
-I completely forgot to specify the "Stretch Goal" in the prompt! I didn't ask the AI to implement **Pagination** (`limit` and `offset`) for the `GET /tasks` route, so it built a standard route that returns all items at once.
-
-## 💾 Database Integration (Week 3)
-
-- **Why SQLite:** It was chosen because it requires zero configuration, operates from a single file, and ensures data survives server restarts perfectly.
-- **Where the data lives:** The data lives in a file named `tasks.db`. This file is automatically created and seeded with initial tasks the first time the server runs.
-- **How to run:** Start the API using `python -m uvicorn main:app --reload`[cite: 1].
-- **SQL Exploration:** I used DB Browser to run raw queries like `SELECT COUNT(*) FROM tasks;` to verify data independently of the API[cite: 1].
+I completely forgot to specify the "Stretch Goal" in the prompt! I didn't ask the AI to implement Pagination (`limit` and `offset`) for the `GET /tasks` route, so it built a standard route that returns all items at once.
 
 ### DB Browser Snapshot
 ![DB Browser View](./db_screenshot.png)
 
-## 🤖 Bonus Stage: The AI Rematch (Code Review)
+## 🐘 Final Stage: PostgreSQL & Docker Persistence Proof
 
-Nesta etapa bônus, criei um prompt com regras de negócio estritas e desafiei uma IA (Claude) a realizar a mesma migração do armazenamento em memória para SQLite. O objetivo foi realizar uma auditoria técnica (Code Review) para comparar as soluções.
+To confirm the migration from SQLite to a fully containerized **PostgreSQL** database was successful, the persistence was verified directly inside the running container via the `psql` CLI — connecting to the `tasks` database and querying the `tasks` table to confirm both the schema (`\dt`) and the seeded data survived a container restart.
 
-**O que a IA fez melhor (Acertos Arquiteturais):**
-* **Gerenciamento de Conexões:** Implementou um `contextmanager` para abrir e fechar a conexão com o banco a cada requisição, prevenindo *memory leaks*.
-* **Acesso aos Dados:** Utilizou `conn.row_factory = sqlite3.Row`, o que permite acessar os valores pelo nome da coluna (ex: `row["title"]`) em vez de índices, tornando o código mais legível e sustentável.
-* **Princípio DRY (Don't Repeat Yourself):** Criou funções auxiliares (`find_task`, `row_to_task`) para isolar a lógica de busca e formatação, reduzindo a duplicação de código nas rotas.
+![psql Terminal Verification](./db_screenshot_psql.png)
 
-**O que a IA errou ou ignorou sutilmente (Pontos de Atenção):**
-* **Funcionalidades Obsoletas:** A IA utilizou o decorador `@app.on_event("startup")` para a inicialização do banco. Em versões recentes do FastAPI, esse método foi descontinuado (*deprecated*), sendo o uso de *Lifespan events* a prática recomendada atual.
+```bash
+docker exec -it task-api-python-db-1 psql -U postgres -d tasks
+```
 
-**O que não foi solicitado e ela decidiu sozinha (Comportamento Implícito):**
-* **Validação de Dados:** Implementou proativamente schemas completos do Pydantic (`TaskCreate`, `TaskUpdate`) e descrições ricas para o Swagger, mesmo sem exigência explícita no prompt.
-* **Mock Data Específico:** Gerou dados de *seed* altamente específicos baseados em suposições próprias (ex: "Configurar CNC router").
+```
+tasks=# \dt
+        List of relations
+ Schema | Name  | Type  |  Owner
+--------+-------+-------+----------
+ public | tasks | table | postgres
+(1 row)
 
-**Veredito:**
-A ferramenta de IA é excelente para gerar *boilerplate* e sugerir padrões de design mais avançados, mas a revisão humana crítica continua sendo indispensável para identificar práticas desatualizadas da documentação do framework e manter o controle total sobre a arquitetura da aplicação.
+tasks=# SELECT * FROM tasks;
+ id |            title             | done
+----+-------------------------------+------
+  1 | Aprender Docker               | f
+  2 | Configurar variáveis de ambiente | t
+  3 | Conectar API no Postgres      | f
+(3 rows)
+```
 
+This confirms the data is no longer tied to the Python process's memory or a local `.db` file — it now lives in a dedicated, containerized relational database, exactly as it would in a production environment.
 
+## 🤖  Bonus Stage: AI Code Review (SQLite phase)
+
+In this bonus stage, I created a prompt with strict business rules and challenged an AI (Claude) to perform the same storage migration. The goal was to conduct a technical audit (code review) to compare the solutions.
+
+### What the AI did better (Architectural Wins)
+
+* **Connection Management:** Implemented a `contextmanager` to open and close the database connection on each request, preventing memory leaks.
+* **Data Access:** Used `conn.row_factory = sqlite3.Row`, which allows accessing values by column name (e.g., `row["title"]`) instead of indices, making the code more readable and maintainable.
+* **DRY Principle (Don't Repeat Yourself):** Created helper functions (`find_task`, `row_to_task`) to isolate lookup and formatting logic, reducing code duplication across the routes.
+
+### What the AI got wrong or quietly overlooked (Points of Attention)
+
+* **Deprecated Features:** The AI used the `@app.on_event("startup")` decorator for database initialization. In recent versions of FastAPI, this method has been deprecated, with Lifespan events being the current recommended practice.
+
+### What wasn't requested and it decided on its own (Implicit Behavior)
+
+* **Data Validation:** Proactively implemented full Pydantic schemas (`TaskCreate`, `TaskUpdate`) and rich descriptions for Swagger, even without explicit requirements in the prompt.
+* **Specific Mock Data:** Generated highly specific seed data based on its own assumptions (e.g., "Set up CNC router").
+
+**Verdict:** The AI tool is excellent for generating boilerplate and suggesting more advanced design patterns, but critical human review remains indispensable for spotting outdated practices in framework documentation and maintaining full control over the application's architecture.
