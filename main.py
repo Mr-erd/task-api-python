@@ -1,33 +1,25 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import sqlite3
 import os
 import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 
-app = FastAPI()
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-# -----------------
-# MODELOS DE DADOS
-# -----------------
+# Modelos de Dados
 class TaskCreate(BaseModel):
     title: str
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = None
-    done: bool | None = None
+    title: Optional[str] = None
+    done: Optional[bool] = None
 
 
-# -------------------
-# BANCO DE DADOS (POSTGRES)
-# -------------------
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-
+# Inicialização do Banco
 def init_db():
     with psycopg.connect(DATABASE_URL) as conn:
         conn.execute("""
@@ -37,7 +29,6 @@ def init_db():
                 done BOOLEAN NOT NULL DEFAULT FALSE
             )
         """)
-
         count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         if count == 0:
             seed_data = [
@@ -45,9 +36,11 @@ def init_db():
                 ("Configurar variáveis de ambiente", True),
                 ("Conectar API no Postgres", False)
             ]
-            # O cursor() é invocado antes do executemany
             conn.cursor().executemany("INSERT INTO tasks (title, done) VALUES (%s, %s)", seed_data)
         conn.commit()
+
+
+app = FastAPI()
 
 
 @app.on_event("startup")
@@ -55,105 +48,75 @@ def on_startup():
     init_db()
 
 
-# -----------------
-# ROTAS DE SISTEMA (Stage 1)
-# -----------------
-@app.get("/")
+# Rotas
+@app.get("/", tags=["Sistema"])
 def read_root():
-    return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
+    return {"name": "Task API", "version": "2.0 (Postgres)"}
 
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-
-# -----------------
-# ROTAS CRUD
-# -----------------
-
-# READ: Listar todas as tarefas
-@app.get("/tasks")
+@app.get("/tasks", tags=["Tarefas"])
 def get_tasks():
-    cursor.execute("SELECT * FROM tasks")  #
+    try:
+        with psycopg.connect(DATABASE_URL) as conn:
+            cursor = conn.execute("SELECT id, title, done FROM tasks ORDER BY id")
+            rows = cursor.fetchall()
+            return [{"id": row[0], "title": row[1], "done": row[2]} for row in rows]
+    except Exception as e:
+        # Isso vai jogar o erro exato na tela do curl em vez de dar Erro 500
+        return {"erro_fatal": str(e)}
 
-    tasks = []
-    for row in cursor.fetchall():
-        # row[0] é id, row[1] é title, row[2] é done
-        tasks.append({"id": row[0], "title": row[1], "done": bool(row[2])})
 
-    return tasks
-
-
-# READ: Listar uma tarefa específica
-@app.get("/tasks/{task_id}")
+@app.get("/tasks/{task_id}", tags=["Tarefas"])
 def get_task(task_id: int):
-    # O sinal de interrogação (?) protege o banco contra ataques (Parameterized query)
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))  #
-    row = cursor.fetchone()
-
-    if row is None:
-        raise HTTPException(status_code=404, detail="Task not found")  # [cite: 1]
-
-    return {"id": row[0], "title": row[1], "done": bool(row[2])}
+    with psycopg.connect(DATABASE_URL) as conn:
+        cursor = conn.execute("SELECT id, title, done FROM tasks WHERE id = %s", (task_id,))
+        row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return {"id": row[0], "title": row[1], "done": row[2]}
 
 
-# CREATE: Adicionar uma nova tarefa
-@app.post("/tasks", status_code=201)
+@app.post("/tasks", status_code=201, tags=["Tarefas"])
 def create_task(task: TaskCreate):
     if not task.title.strip():
-        raise HTTPException(status_code=400, detail="Title cannot be empty")  #
-
-    # Insere a tarefa no banco usando placeholder (?) para segurança
-    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (task.title, 0))  #
-    conn.commit()
-
-    # Recupera o ID que o próprio banco de dados gerou automaticamente[cite: 1]
-    new_id = cursor.lastrowid
-
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    with psycopg.connect(DATABASE_URL) as conn:
+        cursor = conn.execute(
+            "INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id",
+            (task.title, False)
+        )
+        new_id = cursor.fetchone()[0]
     return {"id": new_id, "title": task.title, "done": False}
 
 
-# UPDATE: Atualizar uma tarefa existente
-@app.put("/tasks/{task_id}")
+@app.put("/tasks/{task_id}", tags=["Tarefas"])
 def update_task(task_id: int, task: TaskUpdate):
-    # 1. Verifica se a tarefa existe
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
-    row = cursor.fetchone()
+    with psycopg.connect(DATABASE_URL) as conn:
+        cursor = conn.execute("SELECT id, title, done FROM tasks WHERE id = %s", (task_id,))
+        row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    if row is None:
-        raise HTTPException(status_code=404, detail="Task not found")  #
+        current_title = row[1]
+        current_done = bool(row[2])
 
-    current_title = row[1]
-    current_done = bool(row[2])
+        new_title = task.title if task.title is not None else current_title
+        new_done = task.done if task.done is not None else current_done
 
-    # 2. Prepara os novos valores
-    new_title = task.title if task.title is not None else current_title
-    new_done = task.done if task.done is not None else current_done
+        if task.title is not None and not task.title.strip():
+            raise HTTPException(status_code=400, detail="Title cannot be empty")
 
-    if task.title is not None and not task.title.strip():
-        raise HTTPException(status_code=400, detail="Title cannot be empty")  #
-
-    # 3. Executa o UPDATE no banco de dados
-    cursor.execute(
-        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
-        (new_title, int(new_done), task_id)
-    )
-    conn.commit()
-
+        conn.execute(
+            "UPDATE tasks SET title = %s, done = %s WHERE id = %s",
+            (new_title, new_done, task_id)
+        )
     return {"id": task_id, "title": new_title, "done": new_done}
 
 
-# DELETE: Remover uma tarefa
-@app.delete("/tasks/{task_id}", status_code=204)  # [cite: 1]
+@app.delete("/tasks/{task_id}", status_code=204, tags=["Tarefas"])
 def delete_task(task_id: int):
-    # 1. Verifica se a tarefa existe
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
-    if cursor.fetchone() is None:
-        raise HTTPException(status_code=404, detail="Task not found")  # [cite: 1]
-
-    # 2. Executa o DELETE no banco de dados[cite: 1]
-    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))  # [cite: 1]
-    conn.commit()
-
-    return None
+    with psycopg.connect(DATABASE_URL) as conn:
+        cursor = conn.execute("SELECT id FROM tasks WHERE id = %s", (task_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        conn.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
