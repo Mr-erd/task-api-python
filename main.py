@@ -1,6 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sqlite3
+import os
+import psycopg
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 
 app = FastAPI()
 
@@ -17,34 +21,38 @@ class TaskUpdate(BaseModel):
     done: bool | None = None
 
 
-# -----------------
-# BANCO DE DADOS (MEMÓRIA)
-# -----------------
+# -------------------
+# BANCO DE DADOS (POSTGRES)
+# -------------------
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 1. Conecta ao banco (isso cria o arquivo tasks.db automaticamente)
-conn = sqlite3.connect("tasks.db", check_same_thread=False)
-cursor = conn.cursor()
 
-# 2. Cria a tabela 'tasks' se ela ainda não existir
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        done INTEGER NOT NULL DEFAULT 0
-    )
-""")
-conn.commit()
+def init_db():
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                done BOOLEAN NOT NULL DEFAULT FALSE
+            )
+        """)
 
-# 3. Conta quantas tarefas existem e insere exemplos apenas se a tabela estiver vazia
-cursor.execute("SELECT COUNT(*) FROM tasks")
-count = cursor.fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        if count == 0:
+            seed_data = [
+                ("Aprender Docker", False),
+                ("Configurar variáveis de ambiente", True),
+                ("Conectar API no Postgres", False)
+            ]
+            # O cursor() é invocado antes do executemany
+            conn.cursor().executemany("INSERT INTO tasks (title, done) VALUES (%s, %s)", seed_data)
+        conn.commit()
 
-if count == 0:
-    cursor.executemany(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)",
-        [("Buy milk", 0), ("Learn FastAPI", 1), ("Build a CRUD API", 0)]
-    )
-    conn.commit()
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 
 # -----------------
