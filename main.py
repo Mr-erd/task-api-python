@@ -1,7 +1,7 @@
 import os
 import psycopg
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from supabase import create_client, Client
@@ -52,6 +52,27 @@ def init_db():
 
 
 app = FastAPI()
+
+
+@app.get("/public/info", status_code=200)
+def public_info():
+    # Retorna uma mensagem pública sem exigir nenhuma autenticação
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile")
+def protected_profile(request: Request):
+    # Extrai o token do cabeçalho da requisição
+    auth_header = request.headers.get("Authorization")
+
+    # Verifica se o cabeçalho está faltando ou não possui o formato "Bearer <token>"
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    # Extrai apenas a string do token
+    token = auth_header.split(" ")[1]
+
+    return {"message": "Você alcançou a rota protegida!", "token_apresentado": token}
 
 
 @app.post("/auth/signup", status_code=201)
