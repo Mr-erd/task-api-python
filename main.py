@@ -62,17 +62,26 @@ def public_info():
 
 @app.get("/protected/profile")
 def protected_profile(request: Request):
-    # Extrai o token do cabeçalho da requisição
     auth_header = request.headers.get("Authorization")
 
-    # Verifica se o cabeçalho está faltando ou não possui o formato "Bearer <token>"
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Access token required")
 
-    # Extrai apenas a string do token
     token = auth_header.split(" ")[1]
 
-    return {"message": "Você alcançou a rota protegida!", "token_apresentado": token}
+    try:
+        # Pergunta ao Supabase se o token é válido
+        user_response = supabase.auth.get_user(token)
+
+        # Se for validado com sucesso, retorna os dados seguros do usuário
+        return {
+            "message": "Acesso autorizado!",
+            "user_id": user_response.user.id,
+            "email": user_response.user.email
+        }
+    except Exception:
+        # Se o token estiver expirado, adulterado ou inválido, barra a entrada
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 @app.post("/auth/signup", status_code=201)
