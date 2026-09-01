@@ -17,6 +17,10 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 print("Servidor executando e conectado ao Supabase")
 
 # Modelos de Dados
+class UserCredentials(BaseModel):
+    email: str
+    password: str
+
 class TaskCreate(BaseModel):
     title: str
 
@@ -48,6 +52,33 @@ def init_db():
 
 
 app = FastAPI()
+
+
+@app.post("/auth/signup", status_code=201)
+def signup(credentials: UserCredentials):
+    try:
+        # Repassa o email e senha para o Supabase registrar
+        response = supabase.auth.sign_up({
+            "email": credentials.email,
+            "password": credentials.password
+        })
+        return response
+    except Exception as e:
+        # Se faltar dados ou der erro no Supabase, retorna 400 Bad Request
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/auth/login", status_code=200)
+def login(credentials: UserCredentials):
+    try:
+        # Tenta autenticar o usuário no Supabase
+        response = supabase.auth.sign_in_with_password({
+            "email": credentials.email,
+            "password": credentials.password
+        })
+        return response
+    except Exception:
+        # Se a senha estiver errada, retorna 401 Unauthorized
+        raise HTTPException(status_code=401, detail="Invalid login credentials")
 
 
 @app.on_event("startup")
