@@ -2,6 +2,8 @@ import os
 import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
 from supabase import create_client, Client
@@ -51,6 +53,18 @@ def init_db():
         conn.commit()
 
 
+
+
+security = HTTPBearer()
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        user_response = supabase.auth.get_user(token)
+        return {"user": user_response.user, "token": token}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 app = FastAPI()
 
 
@@ -60,28 +74,25 @@ def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
 
+# Rota de perfil refatorada (limpa e protegida em 1 linha)
 @app.get("/protected/profile")
-def protected_profile(request: Request):
-    auth_header = request.headers.get("Authorization")
+def protected_profile(auth_data: dict = Depends(get_current_user)):
+    user = auth_data["user"]
+    return {"message": "Acesso autorizado!", "user_id": user.id, "email": user.email}
 
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
+# Nova rota protegida usando o mesmo guarda
+@app.get("/protected/dashboard")
+def dashboard(auth_data: dict = Depends(get_current_user)):
+    user = auth_data["user"]
+    return {"message": f"Bem-vindo ao seu painel, {user.email}!"}
 
-    token = auth_header.split(" ")[1]
-
-    try:
-        # Pergunta ao Supabase se o token é válido
-        user_response = supabase.auth.get_user(token)
-
-        # Se for validado com sucesso, retorna os dados seguros do usuário
-        return {
-            "message": "Acesso autorizado!",
-            "user_id": user_response.user.id,
-            "email": user_response.user.email
-        }
-    except Exception:
-        # Se o token estiver expirado, adulterado ou inválido, barra a entrada
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+# Rota de Logout
+@app.post("/auth/logout", status_code=204)
+def logout(auth_data: dict = Depends(get_current_user)):
+    # O Supabase invalida o token no servidor deles
+    token = auth_data["token"]
+    supabase.auth.sign_out(token)
+    return
 
 
 @app.post("/auth/signup", status_code=201)
