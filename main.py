@@ -4,10 +4,17 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from supabase import create_client, Client
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Recupere a URL do banco de dados JUNTO com as chaves do Supabase
+DATABASE_URL = os.getenv("DATABASE_URL")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+print("Servidor executando e conectado ao Supabase")
 
 # Modelos de Dados
 class TaskCreate(BaseModel):
